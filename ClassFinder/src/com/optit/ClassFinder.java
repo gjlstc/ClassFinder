@@ -10,6 +10,7 @@ import java.util.LinkedList;
 import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.zip.ZipFile;
 
 import javax.swing.JFrame;
 
@@ -116,47 +117,36 @@ public class ClassFinder implements Runnable
 			
 			for (int i=0;i<args.length;i++)
 			{
-				switch (args[i])
+				if (args[i].equals(Parameters.directory))
 				{
-					case Parameters.directory:
-					{
-						parameters.setProperty(Parameters.directory, args[++i]);
-						break;
-					}
-					case Parameters.classname:
-					{
-						parameters.setProperty(Parameters.classname, args[++i]);
-						break;
-					}
-					case Parameters.matchCase:
-					{
-						parameters.setProperty(Parameters.matchCase, "true");
-						break;
-					}
-					case Parameters.recursiveSearch:
-					{
-						parameters.setProperty(Parameters.recursiveSearch, "true");
-						break;
-					}
-					case Parameters.verbose:
-					{
-						parameters.setProperty(Parameters.verbose, "true");
-						break;
-					}
-					case "-help":
-					case "--help":
-					case "-?":
-					case "--?":
-					{
-						printHelp();
-						System.exit(0);
-					}
-					default:
-					{
-						logger.log("Unknown parameter: " + args[i]);
-						logger.log();
-						return false;
-					}
+					parameters.setProperty(Parameters.directory, args[++i]);
+				}
+				else if(args[i].equals(Parameters.classname))
+				{
+					parameters.setProperty(Parameters.classname, args[++i]);
+				}
+				else if (args[i].equals(Parameters.matchCase))
+				{
+					parameters.setProperty(Parameters.matchCase, "true");
+				}
+				else if (args[i].equals(Parameters.recursiveSearch))
+				{
+					parameters.setProperty(Parameters.recursiveSearch, "true");
+				}
+				else if (args[i].equals(Parameters.verbose))
+				{
+					parameters.setProperty(Parameters.verbose, "true");
+				}
+				else if (args[i].equals(Parameters.directory)||args[i].equals(Parameters.directory)||args[i].equals(Parameters.directory)||args[i].equals(Parameters.directory)||args[i].equals(Parameters.directory))
+				{
+					printHelp();
+					System.exit(0);
+				}
+				else
+				{
+					logger.log("Unknown parameter: " + args[i]);
+					logger.log();
+					return false;
 				}
 			}
 			return true;
@@ -279,8 +269,10 @@ public class ClassFinder implements Runnable
 			// The rest of the files: jar, war, ear, zip, rar
 			else
 			{
-				try (JarFile jarFile = new JarFile(file))
+				JarFile jarFile;
+				try
 				{
+					jarFile = new JarFile(file);
 					Enumeration<JarEntry> entries = jarFile.entries();
 					while(entries.hasMoreElements())
 					{
