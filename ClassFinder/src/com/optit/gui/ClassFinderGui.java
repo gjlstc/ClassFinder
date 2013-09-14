@@ -131,13 +131,14 @@ public class ClassFinderGui {
 		resultsTable.setFillsViewportHeight(true);
 		// Make table sort-able
 		resultsTable.setAutoCreateRowSorter(true);
-		
+		// Make the table auto-display vertical scrollbar so must not allow auto-resize
+		resultsTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		// Set column widths
-		resultsTable.getColumnModel().getColumn(0).setPreferredWidth(40);
-		resultsTable.getColumnModel().getColumn(1).setPreferredWidth(125);
+		resultsTable.getColumnModel().getColumn(0).setPreferredWidth(210);
+		resultsTable.getColumnModel().getColumn(1).setPreferredWidth(390);
 		
 		JScrollPane scrollPane = new JScrollPane(resultsTable);
-		
+
 		statusBar = new JLabel("Ready");
 		
 		JLabel lblRecursive = new JLabel("Recursive:");
