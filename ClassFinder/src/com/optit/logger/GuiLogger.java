@@ -42,7 +42,13 @@ public class GuiLogger implements Logger
 	@Override
 	public void log(String className, String location) 
 	{
-		tm.addRow(new String[] {className, location});
+		tm.addRow(new String[] {className, location,""});
+	}
+	
+	@Override
+	public void log(String className, String location, String Method) 
+	{
+		tm.addRow(new String[] {className, location, Method});
 	}
 
 	@Override

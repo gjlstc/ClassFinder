@@ -8,6 +8,8 @@ public interface Logger
 	
 	public void log(String className, String location);
 	
+	public void log(String className, String location, String Method);
+	
 	public void logErr(String line);
 	
 	public void logVerbose(String line);

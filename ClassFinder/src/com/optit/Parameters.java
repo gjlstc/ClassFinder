@@ -13,4 +13,5 @@ public abstract class Parameters
 	public static final String matchCase = "-m";
 	public static final String recursiveSearch = "-r";
 	public static final String verbose = "-v";
+	public static final String matchMethodName = "-o";
 }

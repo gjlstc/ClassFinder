@@ -24,7 +24,9 @@ import com.optit.ClassFinder;
 import com.optit.Parameters;
 import com.optit.SearchableFileFilter;
 import com.optit.logger.GuiLogger;
+
 import org.eclipse.wb.swing.FocusTraversalOnArray;
+
 import java.awt.Component;
 
 public class ClassFinderGui {
@@ -32,6 +34,7 @@ public class ClassFinderGui {
 	private JFrame frame;
 	private JTextField tfJarFileFolder;
 	private JTextField tfClassName;
+	private JTextField tfMethodName;
 	private JCheckBox chckbxMatchCase;
 	private JFileChooser fc;
 	private ClassFinderTableModel tm;
@@ -82,11 +85,16 @@ public class ClassFinderGui {
 		
 		JLabel lblClassName = new JLabel("Class name:");
 		
+		JLabel lblMethodName = new JLabel("Method name:");
+		
 		tfJarFileFolder = new JTextField();
 		tfJarFileFolder.setColumns(10);
 		
 		tfClassName = new JTextField();
 		tfClassName.setColumns(10);
+		
+		tfMethodName = new JTextField();
+		tfMethodName.setColumns(10);
 		
 		fc = new JFileChooser();
 		fc.setDialogTitle("Choose file or folder");
@@ -121,7 +129,7 @@ public class ClassFinderGui {
 		chckbxMatchCase = new JCheckBox("");
 		chckbxMatchCase.setSelected(true);
 		
-		tm = new ClassFinderTableModel (new String[] {"Class", "Location"}, 0);
+		tm = new ClassFinderTableModel (new String[] {"Class", "Location", "Method"}, 0);
 		resultsTable = new JTable(tm);
 		// Enable column selection for copy/paste
 		resultsTable.setColumnSelectionAllowed(true);
@@ -134,9 +142,9 @@ public class ClassFinderGui {
 		// Make the table auto-display vertical scrollbar so must not allow auto-resize
 		resultsTable.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
 		// Set column widths
-		resultsTable.getColumnModel().getColumn(0).setPreferredWidth(210);
-		resultsTable.getColumnModel().getColumn(1).setPreferredWidth(390);
-		
+		resultsTable.getColumnModel().getColumn(0).setPreferredWidth(170);
+		resultsTable.getColumnModel().getColumn(1).setPreferredWidth(330);
+		resultsTable.getColumnModel().getColumn(2).setPreferredWidth(500);
 		JScrollPane scrollPane = new JScrollPane(resultsTable);
 
 		statusBar = new JLabel("Ready");
@@ -157,13 +165,15 @@ public class ClassFinderGui {
 							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
 								.addComponent(lblJarFile)
 								.addComponent(lblClassName)
-								.addComponent(lblMatchCase))
-							.addGap(18)
+								.addComponent(lblMatchCase)
+								.addComponent(lblMethodName))
+							.addGap(90)
 							.addGroup(groupLayout.createParallelGroup(Alignment.LEADING)
 								.addGroup(groupLayout.createSequentialGroup()
 									.addGroup(groupLayout.createParallelGroup(Alignment.LEADING, false)
 										.addComponent(tfClassName)
-										.addComponent(tfJarFileFolder, GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE))
+										.addComponent(tfJarFileFolder, GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE)
+										.addComponent(tfMethodName, GroupLayout.DEFAULT_SIZE, 300, Short.MAX_VALUE))
 									.addGap(18)
 									.addGroup(groupLayout.createParallelGroup(Alignment.LEADING, false)
 										.addComponent(btnSearch, GroupLayout.DEFAULT_SIZE, GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE)
@@ -171,7 +181,7 @@ public class ClassFinderGui {
 								.addGroup(groupLayout.createSequentialGroup()
 									.addComponent(chckbxMatchCase)
 									.addGap(18)
-									.addComponent(lblRecursive, GroupLayout.PREFERRED_SIZE, 58, GroupLayout.PREFERRED_SIZE)
+									.addComponent(lblRecursive, GroupLayout.PREFERRED_SIZE, 80, GroupLayout.PREFERRED_SIZE)
 									.addGap(20)
 									.addComponent(chckbxRecursiveSearch, GroupLayout.PREFERRED_SIZE, 21, GroupLayout.PREFERRED_SIZE))))
 						.addComponent(statusBar))
@@ -191,6 +201,10 @@ public class ClassFinderGui {
 						.addComponent(tfClassName, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
 						.addComponent(btnSearch))
 					.addPreferredGap(ComponentPlacement.RELATED)
+					.addGroup(groupLayout.createParallelGroup(Alignment.BASELINE)
+						.addComponent(tfMethodName, GroupLayout.PREFERRED_SIZE, GroupLayout.DEFAULT_SIZE, GroupLayout.PREFERRED_SIZE)
+						.addComponent(lblMethodName))
+					.addPreferredGap(ComponentPlacement.RELATED)
 					.addGroup(groupLayout.createParallelGroup(Alignment.TRAILING)
 						.addComponent(lblMatchCase)
 						.addComponent(chckbxMatchCase)
@@ -200,26 +214,27 @@ public class ClassFinderGui {
 								.addComponent(lblRecursive))
 							.addComponent(chckbxRecursiveSearch, GroupLayout.PREFERRED_SIZE, 21, GroupLayout.PREFERRED_SIZE)))
 					.addGap(13)
-					.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 312, Short.MAX_VALUE)
+					.addComponent(scrollPane, GroupLayout.DEFAULT_SIZE, 285, Short.MAX_VALUE)
 					.addPreferredGap(ComponentPlacement.RELATED)
 					.addComponent(statusBar)
 					.addGap(6))
 		);
 		frame.getContentPane().setLayout(groupLayout);
-		frame.setFocusTraversalPolicy(new FocusTraversalOnArray(new Component[]{tfJarFileFolder, btnBrowse, tfClassName, chckbxMatchCase, chckbxRecursiveSearch, btnSearch}));
+		frame.setFocusTraversalPolicy(new FocusTraversalOnArray(new Component[]{tfJarFileFolder, btnBrowse, tfClassName, tfMethodName, chckbxMatchCase, chckbxRecursiveSearch, btnSearch}));
 	}
 	
 	private void performSearch()
 	{
+		String errorPath = checkPath(tfJarFileFolder.getText());
 		// Path is empty
 		if (tfJarFileFolder.getText().isEmpty())
 		{
 			JOptionPane.showMessageDialog(null, "No file or folder was specified!", "Error", JOptionPane.ERROR_MESSAGE);
 		}
 		// Path does not exist
-		else if (!new File(tfJarFileFolder.getText()).exists())
+		else if (!"".equals(errorPath))
 		{
-			JOptionPane.showMessageDialog(null, "Specified path does not exist!", "Error", JOptionPane.ERROR_MESSAGE);
+			JOptionPane.showMessageDialog(null, "Specified path: \""+errorPath+"\" does not exist!", "Error", JOptionPane.ERROR_MESSAGE);
 		}
 		// Class name is empty
 		else if (tfClassName.getText().isEmpty())
@@ -238,7 +253,8 @@ public class ClassFinderGui {
 			params.add(Parameters.classname);
 			params.add(tfClassName.getText());
 			params.add(Parameters.verbose);
-			
+			params.add(Parameters.matchMethodName);
+			params.add(tfMethodName.getText());
 			if (chckbxMatchCase.isSelected())
 			{
 				params.add(Parameters.matchCase);
@@ -253,5 +269,19 @@ public class ClassFinderGui {
 			if (finder.parseArguments(params.toArray(new String[] {})))
 				new Thread(finder).start();
 		}
+	}
+	
+	private String checkPath(String filepaths)
+	{
+		String errorPath = "";
+		String[] directoryList = filepaths.split(";");
+		for (String directory : directoryList) {
+			if(!new File(directory).exists())
+			{
+				errorPath=directory;
+				break;
+			}
+		}
+		return errorPath;
 	}
 }

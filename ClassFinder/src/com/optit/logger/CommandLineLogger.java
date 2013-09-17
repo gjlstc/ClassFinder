@@ -53,6 +53,12 @@ public class CommandLineLogger implements Logger
 		log ("Class \"" + className + "\" found at \"" + location);
 	}
 	
+	@Override
+	public void log(String className, String location, String Method) 
+	{
+		log ("Class \"" + className + "\" found at \"" + location + " and Method \"" + Method + "\"");
+	}
+	
 	/**
 	 * Logs a new line into the standard output
 	 */

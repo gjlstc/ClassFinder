@@ -4,19 +4,33 @@ import java.awt.EventQueue;
 import java.awt.HeadlessException;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Properties;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.zip.ZipFile;
 
 import javax.swing.JFrame;
 
 import com.optit.gui.ClassFinderGui;
 import com.optit.logger.CommandLineLogger;
 import com.optit.logger.Logger;
+import com.sun.tools.classfile.AccessFlags;
+import com.sun.tools.classfile.Attribute;
+import com.sun.tools.classfile.ClassFile;
+import com.sun.tools.classfile.ConstantPool;
+import com.sun.tools.classfile.ConstantPoolException;
+import com.sun.tools.classfile.Descriptor;
+import com.sun.tools.classfile.Descriptor.InvalidDescriptor;
+import com.sun.tools.classfile.DescriptorException;
+import com.sun.tools.classfile.Exceptions_attribute;
+import com.sun.tools.classfile.Method;
+import com.sun.tools.classfile.Signature;
+import com.sun.tools.classfile.Signature_attribute;
+import com.sun.tools.classfile.Type;
 
 public class ClassFinder implements Runnable
 {
@@ -114,6 +128,7 @@ public class ClassFinder implements Runnable
 			parameters.setProperty(Parameters.matchCase, "false");
 			parameters.setProperty(Parameters.recursiveSearch, "false");
 			parameters.setProperty(Parameters.verbose, "false");
+			parameters.setProperty(Parameters.matchMethodName, "");
 			
 			for (int i=0;i<args.length;i++)
 			{
@@ -124,6 +139,10 @@ public class ClassFinder implements Runnable
 				else if(args[i].equals(Parameters.classname))
 				{
 					parameters.setProperty(Parameters.classname, args[++i]);
+				}
+				else if(args[i].equals(Parameters.matchMethodName))
+				{
+					parameters.setProperty(Parameters.matchMethodName, args[++i]);
 				}
 				else if (args[i].equals(Parameters.matchCase))
 				{
@@ -165,6 +184,7 @@ public class ClassFinder implements Runnable
         logger.log("[-m]			Match case");
         logger.log("[-r]			Recursive search (search sub directories)");
         logger.log("[-v]			Enables verbose output");
+        logger.log("[-o]			Match Method Name");
         logger.log("[-help|--help|-h|-?]	Display this help");
         logger.log();
         logger.log("The directory specified will be searched recursviely.");
@@ -206,7 +226,7 @@ public class ClassFinder implements Runnable
 
 		logger.logVerbose("Building directory search tree...");
 		// Get file tree of directory
-		buildFileList(new File(parameters.getProperty(Parameters.directory)), parameters.getProperty(Parameters.recursiveSearch).equals("true"));
+		buildFileList(parameters.getProperty(Parameters.directory), parameters.getProperty(Parameters.recursiveSearch).equals("true"));
 		
 		Iterator<File> fileIterator = files.iterator();
 		// Loop over all the filtered files
@@ -215,7 +235,7 @@ public class ClassFinder implements Runnable
 			File file = fileIterator.next();
 			
 			// Use full qualified file name for logging, not the \ replaced one
-			logger.logVerbose("Looking at: " + file.getAbsolutePath());
+			//logger.logVerbose("Looking at: " + file.getAbsolutePath());
 			
 			String fullFileName = file.getAbsolutePath().replaceAll("\\\\", "/");
 			String fileName = file.getName();
@@ -243,7 +263,24 @@ public class ClassFinder implements Runnable
 					||
 					(!containsPackageQualifier && fileName.equals(classname + ".class")))
 				{
-					logger.log(file.getName(), file.getAbsolutePath());
+					//logger.log(file.getName(), file.getAbsolutePath());
+					try {
+						findMethod(file.getName(), file.getAbsolutePath() , file);
+					}
+					catch (IOException e)
+					{
+						logger.logVerbose("Error reading file " + fullFileName + ": " + e.getMessage());
+						logger.logErr(e.getMessage());
+					}
+					catch (ConstantPoolException e)
+					{
+						logger.logVerbose("Error reading file from class " + fullFileName + ": " + e.getMessage());
+						logger.logErr(e.getMessage());
+					}
+					catch (InvalidDescriptor e) {
+						logger.logVerbose("Error reading file from class " + fullFileName + ": " + e.getMessage());
+						logger.logErr(e.getMessage());
+					}
 				}
 			}
 			// Direct java source file
@@ -264,6 +301,7 @@ public class ClassFinder implements Runnable
 					(!containsPackageQualifier && fileName.equals(classname + ".java")))
 				{
 					logger.log(file.getName(), file.getAbsolutePath());
+					
 				}
 			}
 			// The rest of the files: jar, war, ear, zip, rar
@@ -287,7 +325,7 @@ public class ClassFinder implements Runnable
 						{
 							if (entryName.endsWith(classname + ".class") || entryName.endsWith(classname + ".java"))
 							{
-								logger.log(entry.getName(), file.getAbsolutePath());
+								findMethod(file.getAbsolutePath(),jarFile,entry);
 							}
 						}
 						// No package qualified, just Class Name
@@ -303,7 +341,7 @@ public class ClassFinder implements Runnable
 								|| 
 								entryName.equals(classname + ".class") || entryName.equals(classname + ".java"))
 							{
-								logger.log(entry.getName(), file.getAbsolutePath());
+								findMethod(file.getAbsolutePath(),jarFile,entry);
 							}
 						}
 					}
@@ -313,10 +351,179 @@ public class ClassFinder implements Runnable
 					logger.logVerbose("Error reading file " + fullFileName + ": " + e.getMessage());
 					logger.logErr(e.getMessage());
 				}
+				catch (ConstantPoolException e)
+				{
+					logger.logVerbose("Error reading file from jar " + fullFileName + ": " + e.getMessage());
+					logger.logErr(e.getMessage());
+				}
+				catch (InvalidDescriptor e)
+				{
+					logger.logVerbose("Error reading file from jar " + fullFileName + ": " + e.getMessage());
+					logger.logErr(e.getMessage());
+				}
 			}
 		}
 		
 		logger.logVerbose("Finished search");
+	}
+	
+	/**
+	 * find method in class file that class file is in jar file 
+	 * @param entry
+	 * @throws IOException 
+	 * @throws ConstantPoolException 
+	 * @throws InvalidDescriptor 
+	 */
+	public void findMethod(String pathName ,JarFile jarFile ,JarEntry entry) throws IOException, ConstantPoolException, InvalidDescriptor
+	{
+		if(!parameters.getProperty(Parameters.matchMethodName).equals(""))
+		{
+			InputStream in = jarFile.getInputStream(entry);
+			ClassFile classFile = (ClassFile) ClassFile.read(in);
+		
+			for (Method method : classFile.methods) {
+				if(method.getName(classFile.constant_pool).equals(parameters.getProperty(Parameters.matchMethodName)))
+				{
+					logger.log(entry.getName() ,pathName ,writeMethod(classFile,method));
+				}
+			}
+		}
+		else
+		{
+			logger.log(entry.getName(),pathName);
+		}
+	}
+	
+	public void findMethod(String className, String pathName, File file) throws IOException, ConstantPoolException, InvalidDescriptor
+	{
+		if(!parameters.getProperty(Parameters.matchMethodName).equals(""))
+		{
+			ClassFile classFile = (ClassFile) ClassFile.read(file);
+		
+			for (Method method : classFile.methods) {
+				if(method.getName(classFile.constant_pool).equals(parameters.getProperty(Parameters.matchMethodName)))
+				{
+					logger.log(file.getName(), file.getAbsolutePath(),writeMethod(classFile,method));
+				}
+			}
+		}
+		else
+		{
+			logger.log(file.getName(), file.getAbsolutePath());
+		}
+	}
+	protected String writeMethod(ClassFile classFile,Method m) throws ConstantPoolException, InvalidDescriptor {
+        
+		StringBuffer strMethod = new StringBuffer();
+		ConstantPool constant_pool = classFile.constant_pool;
+        AccessFlags flags = m.access_flags;
+        
+        Descriptor d;
+        Type.MethodType methodType;
+        List<? extends Type> methodExceptions;
+
+        Signature_attribute sigAttr = (Signature_attribute) m.attributes.get(Attribute.Signature);
+        if (sigAttr == null) {
+            d = m.descriptor;
+            methodType = null;
+            methodExceptions = null;
+        } else {
+            Signature methodSig = sigAttr.getParsedSignature();
+            d = methodSig;
+            try {
+                methodType = (Type.MethodType) methodSig.getType(constant_pool);
+                methodExceptions = methodType.throwsTypes;
+                if (methodExceptions != null && methodExceptions.isEmpty())
+                    methodExceptions = null;
+            } catch (ConstantPoolException e) {
+                // report error?
+                // fall back on standard descriptor
+                methodType = null;
+                methodExceptions = null;
+            }
+        }
+
+        
+        for (Object item: flags.getMethodModifiers()) {
+        	strMethod.append(item);
+        	strMethod.append(" ");
+        }
+        if (methodType != null) {
+        	strMethod.append("<");
+        	strMethod.append(methodType.typeParamTypes);
+        	strMethod.append(">");
+        }
+        if (m.getName(constant_pool).equals("<init>")) {
+        	strMethod.append(classFile.getName().replace("/", "."));
+        	strMethod.append(getJavaParameterTypes(d, flags, constant_pool));
+        } else if (m.getName(constant_pool).equals("<clinit>")) {
+        	strMethod.append("{}");
+        } else {
+        	strMethod.append(d.getReturnType(constant_pool).replace("/", "."));
+        	strMethod.append(" ");
+        	strMethod.append(m.getName(constant_pool));
+        	strMethod.append(getJavaParameterTypes(d, flags, constant_pool));
+        }
+
+        Attribute e_attr = m.attributes.get(Attribute.Exceptions);
+        if (e_attr != null) { // if there are generic exceptions, there must be erased exceptions
+            if (e_attr instanceof Exceptions_attribute) {
+                Exceptions_attribute exceptions = (Exceptions_attribute) e_attr;
+                strMethod.append(" throws ");
+                if (methodExceptions != null) { // use generic list if available
+                    
+                    String sep = "";
+                    for (Object item: methodExceptions) {
+                    	strMethod.append(sep);
+                        strMethod.append(item);
+                        sep = ", ";
+                    }
+                } else {
+                    for (int i = 0; i < exceptions.number_of_exceptions; i++) {
+                        if (i > 0)
+                        	strMethod.append(", ");
+                        strMethod.append(exceptions.getException(i, constant_pool).replace("/", "."));
+                    }
+                }
+            }
+        }
+
+        strMethod.append(";");
+        
+        return strMethod.toString();
+    }
+	
+	String getJavaParameterTypes(Descriptor d, AccessFlags flags,ConstantPool constant_pool) {
+        try {
+            return adjustVarargs(flags, d.getParameterTypes(constant_pool)).replace('/', '.');
+        } catch (ConstantPoolException e) {
+        	logger.logVerbose("Error reading file from jar: " + e.getMessage());
+			logger.logErr(e.getMessage());
+			return "";
+        } catch (DescriptorException e) {
+        	logger.logVerbose("Error reading file from jar: " + e.getMessage());
+			logger.logErr(e.getMessage());
+			return "";
+        }
+    }
+	
+	String adjustVarargs(AccessFlags flags, String params) {
+		int i = params.lastIndexOf("[]");
+        if (i > 0)
+        	return params.substring(0, i) + "..." + params.substring(i+2);
+        return params;
+    }
+	/**
+	 * build file list from a string that split by ";"
+	 * @param directorys
+	 * @param recursive
+	 */
+	public void buildFileList(String directorys, boolean recursive)
+	{
+		String[] directoryList = directorys.split(";");
+		for (String directory : directoryList) {
+			buildFileList(new File(directory),recursive);
+		}
 	}
 	
 	public void buildFileList(File directory, boolean recursive)
