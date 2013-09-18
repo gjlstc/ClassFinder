@@ -382,11 +382,15 @@ public class ClassFinder implements Runnable
 
 						if (containsPackageQualifier)
 						{
-							if (entryName.endsWith(classname + ".class")
-									|| entryName.endsWith(classname + ".java"))
+							if (entryName.endsWith(classname + ".class"))
 							{
 								findMethod(file.getAbsolutePath(), jarFile,
 										entry);
+							}
+							else if (entryName.endsWith(classname + ".java"))
+							{
+								findJavaMethodInJar(file.getAbsolutePath(),
+										jarFile, entry);
 							}
 						}
 						// No package qualified, just Class Name
@@ -408,13 +412,17 @@ public class ClassFinder implements Runnable
 							// Random.java and as no package qualifier was
 							// given, the class is found)
 							if (entryName.endsWith("/" + classname + ".class")
-									|| entryName.endsWith("/" + classname
-											+ ".java")
-									|| entryName.equals(classname + ".class")
-									|| entryName.equals(classname + ".java"))
+									|| entryName.equals(classname + ".class"))
 							{
 								findMethod(file.getAbsolutePath(), jarFile,
 										entry);
+							}
+							else if (entryName.endsWith("/" + classname
+									+ ".java")
+									|| entryName.equals(classname + ".java"))
+							{
+								findJavaMethodInJar(file.getAbsolutePath(),
+										jarFile, entry);
 							}
 						}
 					}
@@ -463,6 +471,53 @@ public class ClassFinder implements Runnable
 				{
 					logger.log(entry.getName(), pathName,
 							writeMethod(classFile, method));
+				}
+			}
+		}
+		else
+		{
+			logger.log(entry.getName(), pathName);
+		}
+	}
+
+	/**
+	 * find method in java file that java file is in jar file
+	 * 
+	 * @param entry
+	 * @throws IOException
+	 * @throws ConstantPoolException
+	 * @throws InvalidDescriptor
+	 */
+	public void findJavaMethodInJar(String pathName, JarFile jarFile,
+			JarEntry entry) throws IOException, ConstantPoolException,
+			InvalidDescriptor
+	{
+		if (!parameters.getProperty(Parameters.matchMethodName).equals(""))
+		{
+			if (astParser == null)
+				astParser = ASTParser.newParser(AST.JLS4);
+
+			BufferedInputStream bufferedInputStream;
+			InputStream in = jarFile.getInputStream(entry);
+			bufferedInputStream = new BufferedInputStream(in);
+			byte[] input = new byte[bufferedInputStream.available()];
+			bufferedInputStream.read(input);
+			bufferedInputStream.close();
+			astParser.setSource(new String(input).toCharArray());
+			CompilationUnit result = (CompilationUnit) astParser
+					.createAST(null);
+			TypeDeclaration type = (TypeDeclaration) result.types().get(0);
+			MethodDeclaration[] methodList = type.getMethods();
+			for(MethodDeclaration methodDeclaration:methodList)
+			{
+				if (methodDeclaration
+						.getName()
+						.toString()
+						.equals(parameters
+								.getProperty(Parameters.matchMethodName)))
+				{
+					logger.log(entry.getName(), pathName,
+							writeMethod(methodDeclaration));
 				}
 			}
 		}
