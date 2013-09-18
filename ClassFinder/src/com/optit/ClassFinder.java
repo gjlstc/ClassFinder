@@ -5,10 +5,8 @@ import java.awt.HeadlessException;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Date;
 import java.util.Enumeration;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -20,7 +18,6 @@ import java.util.jar.JarFile;
 import javax.swing.JFrame;
 
 import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
@@ -507,7 +504,6 @@ public class ClassFinder implements Runnable
 			if (astParser == null)
 				astParser = ASTParser.newParser(AST.JLS4);
 
-			long b = System.currentTimeMillis();
 			BufferedInputStream bufferedInputStream;
 
 			bufferedInputStream = new BufferedInputStream(new FileInputStream(
